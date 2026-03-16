@@ -37,6 +37,15 @@
 - maas has the concepts of "workflows" triggers then in "src/maasserver/worflow/__init__.py"
 - from here we go to "src/maasserver/models/node.py" to find what a node is
     **this file has start_commissioning workflow!**
+
+## Topic: [ongoing]
+type: parallel
+depends: []
+---
+content: Find ActiveDiscoveryService
+notes: src/maasserver/eventloop.py
+---
+
 ## Scratch
 
 ---
