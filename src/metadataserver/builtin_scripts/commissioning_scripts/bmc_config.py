@@ -1252,8 +1252,7 @@ class Redfish(IPMIBase):
                     or ip["Address"].startswith("169.254")
                 ):
                     continue
-                return ip["Address"]
-        print("WARNING: No valid Redfish IPv4 address found.")
+        return addresses[0].get("Address")
 
     def get_bmc_ip(self):
         if self._bmc_ip is None:
