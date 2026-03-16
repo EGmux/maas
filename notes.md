@@ -46,6 +46,30 @@ content: Find ActiveDiscoveryService
 notes: src/maasserver/eventloop.py
 ---
 
+## The MAAS region controller's Heart: [ongoing]
+type: sequential
+depends: [ActiveDiscoveryService]
+---
+content: RegionEventLoop
+notes: src/maasserver/eventloop.py
+---
+
+## The DiscoveryService: [reference]
+type: sequential
+depends: [RegionEventLoop]
+---
+content: src/maasserver/regiondservices/active_discovery.py
+notes: is a twisted TimerService,periodically,coordinates with rackcontrollers
+---
+
+## Where is the definition of DiscoveryService(Spoiler: is in the DB): [ongoing]
+type: parallel
+depends: []
+---
+content: this stuff is located in maaserver/models/config.py
+notes: 
+---
+
 ## Scratch
 
 ---
