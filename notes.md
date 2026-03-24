@@ -39,8 +39,19 @@
     **this file has start_commissioning workflow!**
 ## Scratch
 
-Reduzindo tempo de provisionamento e viabilizando suporte para dual boot, um estudo de caso na implantação e customização da ferramenta MAAS
+Reduzindo tempo de provisionamento e viabilizando suporte para dual boot, um estudo de caso na implantação e customização da ferramenta MAAS w
 
 Reduzindo tempo de provisionamento e viabilizando suporte para dual boot, um estudo de caso na implantação e extensibilidade do Metal as a Service(MAAS)
+
+
+Proposta de TCC
+Atualmente há um esforço enorme em tratar o ambiente de desenvolvimento como descartável vide ferramentas de IaC(Infrastructure as Code) como Ansible(RedHat), Terraform(Hashicorp)
+Helm(Google) etc. No entanto embora exista diversas ferramentas que provisionam máquinas virtuais, containers e até mesmo aplicações há uma escassez de ferramentas para provisionamento 
+bare metal que possuem código aberto, suporte empresarial e consideram casos de uso de ambientes como datacenter on-premises e clouds privadas.
+
+
+
+
 ---
+
 
