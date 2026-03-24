@@ -39,5 +39,8 @@
     **this file has start_commissioning workflow!**
 ## Scratch
 
+Reduzindo tempo de provisionamento e viabilizando suporte para dual boot, um estudo de caso na implantação e customização da ferramenta MAAS
+
+Reduzindo tempo de provisionamento e viabilizando suporte para dual boot, um estudo de caso na implantação e extensibilidade do Metal as a Service(MAAS)
 ---
 
