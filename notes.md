@@ -41,15 +41,15 @@
 
 Reduzindo tempo de provisionamento e viabilizando suporte para dual boot, um estudo de caso na implantação e customização da ferramenta MAAS w
 
-Reduzindo tempo de provisionamento e viabilizando suporte para dual boot, um estudo de caso na implantação e extensibilidade do Metal as a Service(MAAS)
+Reduzindo tempo de provisionamento em sistemas bare-metal e viabilizando suporte para dual boot, um estudo de caso na implantação e extensibilidade do Metal as a Service(MAAS)
 
 
 Proposta de TCC
-Atualmente há um esforço enorme em tratar o ambiente de desenvolvimento como descartável vide ferramentas de IaC(Infrastructure as Code) como Ansible(RedHat), Terraform(Hashicorp)
-Helm(Google) etc. No entanto embora exista diversas ferramentas que provisionam máquinas virtuais, containers e até mesmo aplicações há uma escassez de ferramentas para provisionamento 
-bare metal que possuem código aberto, suporte empresarial e consideram casos de uso de ambientes como datacenter on-premises e clouds privadas.
+Atualmente há um esforço enorme em tratar o ambiente de desenvolvimento como descartável, vide ferramentas de IaC (Infrastructure as Code) como Ansible (RedHat), Terraform (Hashicorp), Helm (Google) etc. No entanto, embora existam diversas ferramentas que provisionam máquinas virtuais, containers e até mesmo aplicações, há uma escassez de ferramentas para provisionamento bare metal que possuam código aberto, suporte empresarial e considerem casos de uso de ambientes on-premises e nuvens privadas.
 
+A escassez de ferramentas impacta não somente o público empresarial, mas também o público acadêmico, visto que o setor de suporte precisa dedicar tempo extra para completar tickets relacionados a formatação de máquinas e provisionamento de laboratórios, além de um orçamento mais limitado. Devido à inerente complexidade dessas tarefas, a equipe técnica pode acabar perdendo horas ou até mesmo dias, o que impacta nas métricas de produtividade do setor, reduzindo a agilidade operacional.
 
+Este trabalho visa introduzir o Metal as a Service (MAAS) como uma ferramenta adequada para solução do problema. Desenvolvido pela Canonical, o software é uma solução de código aberto que possibilita provisionamento automatizado de ambientes bare-metal. Para tal, o presente trabalho apresenta dois estudos de caso: os desafios de implantar tal ferramenta no Cin-UFPE e a contribuição para o projeto através da implementação da feature de dual-boot.
 
 
 ---
