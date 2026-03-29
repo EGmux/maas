@@ -21,10 +21,10 @@
 export DEBIAN_FRONTEND=noninteractive
 
 # Reset cloud-init, so that it can run again when MAAS deploy the image.
-cloud-init clean --logs
+cloud-init single --name cc_maas --frequency always
 
 apt-get autoremove --purge -yq
 apt-get clean -yq
 
 # Cleanup fstab
-rm -r /etc/fstab
+# rm -r /etc/fstab

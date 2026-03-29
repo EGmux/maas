@@ -1,9 +1,5 @@
 source "qemu" "lvm" {
   boot_command    = ["<wait>e<wait5>", "<down><wait><down><wait><down><wait2><end><wait5>", "<bs><bs><bs><bs><wait>autoinstall ipv6.disable=1 ---<wait><f10>"]
-  cd_files = [
-    "./scripts/setup-cloudinit.sh"
-  ]
-  cd_label = "cidata"
   boot_wait       = "2s"
   cpus            = 2
   disk_size       = "8G"
@@ -44,19 +40,38 @@ source "qemu" "lvm" {
 build {
   sources = ["source.qemu.lvm"]
 
+  # Copy curtin hooks
   provisioner "file" {
     destination = "/tmp/curtin-hooks"
     source      = "${path.root}/scripts/curtin-hooks"
   }
 
+  # Copy custom cloud-init module (to be installed via shell)
+  provisioner "file" {
+    source      = "${path.root}/scripts/cc_maas_provision.py"
+    destination = "/tmp/cc_maas_provision.py"
+  }
+
+  # Copy cloud-init module config
+  provisioner "file" {
+    source      = "${path.root}/scripts/99_maas_provision.cfg"
+    destination = "/tmp/99_maas_provision.cfg"
+  }
+
+  # Run all setup scripts
   provisioner "shell" {
-    environment_vars  = ["HOME_DIR=/home/ubuntu", "http_proxy=${var.http_proxy}", "https_proxy=${var.https_proxy}", "no_proxy=${var.no_proxy}"]
+    environment_vars = [
+      "HOME_DIR=/home/ubuntu",
+      "http_proxy=${var.http_proxy}",
+      "https_proxy=${var.https_proxy}",
+      "no_proxy=${var.no_proxy}"
+    ]
     execute_command   = "echo 'ubuntu' | {{ .Vars }} sudo -S -E sh -eux '{{ .Path }}'"
     expect_disconnect = true
-    scripts           = [
+    scripts = [
       "${path.root}/scripts/curtin.sh",
       "${path.root}/scripts/networking.sh",
-      "${path.root}/scripts/setup-cloudinit.sh"
+      "${path.root}/scripts/install-module.sh",
     ]
   }
 

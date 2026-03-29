@@ -6,14 +6,15 @@ autoinstall:
     hostname: ubuntu
     username: ubuntu
     password: "$6$canonical.$0zWaW71A9ke9ASsaOcFTdQ2tx1gSmLxMPrsH0rF0Yb.2AEKNPV1lrF94n6YuPJmnUy2K2/JSDtxuiBDey6Lpa/"
-  
+
   keyboard:
     layout: us
     variant: dvorak
-  
+
   ssh:
     install-server: true
-  
+    allow-pw: true
+
   storage:
     grub:
       update_nvram: true
@@ -22,8 +23,16 @@ autoinstall:
     layout:
       name: lvm
       sizing-policy: all
-  
-  # Only MAAS dependencies - nothing else
+
+  network:
+    version: 2
+    ethernets:
+      en_interfaces:
+        match:
+          name: "en*"
+        dhcp4: true
+        optional: true
+
   packages:
     - postgresql
     - postgresql-contrib
@@ -34,16 +43,10 @@ autoinstall:
     - build-essential
     - libpq-dev
     - libyaml-dev
-    - npm
-    - nodejs
-  
+
   package_update: true
   package_upgrade: true
 
   late-commands:
-    # Passwordless sudo
     - curtin in-target --target=/target -- sh -c 'echo "ubuntu ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/ubuntu'
     - curtin in-target --target=/target -- chmod 440 /etc/sudoers.d/ubuntu
-    - cp /cdrom/setup-cloudinit.sh /target/tmp/setup-cloudinit.sh
-    - curtin in-target --target=/target -- chmod +x /tmp/setup-cloudinit.sh
-    - curtin in-target --target=/target -- /tmp/setup-cloudinit.sh

@@ -1,0 +1,36 @@
+#cloud-config
+# Disable identity module entirely
+# No identity section = no user/password changes
+
+# Explicitly disable modules that change users
+users:
+  - name: ubuntu
+    lock_passwd: true        # Don't change password
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    shell: /bin/bash
+
+# Don't run user/group modules
+system_info:
+  default_user:
+    lock_passwd: true
+
+# Run your setup
+runcmd:
+  - |
+    set -e
+    echo "=== Setting up MAAS development environment ==="
+
+    # Clone MAAS fork
+    cd /home/ubuntu
+    git clone https://github.com/EGmux/maas.git maas-source
+
+    # Change remote
+    cd maas-source
+    git remote add upstream https://github.com/canonical/maas.git
+    git fetch upstream
+    git checkout main
+
+    # Set up Python environment
+    python3 -m venv venv
+    source venv/bin/activate
+    pip install -r requirements.txt

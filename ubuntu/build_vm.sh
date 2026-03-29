@@ -8,19 +8,39 @@ if [[ $RUN_PRG =~ /flatpak-spawn$ ]]; then
 fi
 
 GOLDEN_DISK="$HOME/.local/share/libvirt/images/maas-golden.qcow2"
-VM_NAME="maas-dev"
-CLOUDINIT_NAME="cloud-init"
+VM_NAME="maas-golden"
+MODIFY_IMAGE=false
 
-if [[ ! -f "$GOLDEN_DISK" ]]; then
-    echo "❌ Golden image not found: $GOLDEN_DISK"
-    exit 1
+if [[ ! -f "maas-golden.qcow2"  ]]; then
+	echo "📦 Golden image not found, extracting..."
+	source "extract_image.sh"
 fi
 
-CLONE_DISK="$HOME/.local/share/libvirt/images/${VM_NAME}.qcow2"
-CLONE_CLOUDINIT="$HOME/.local/share/libvirt/images/${CLOUDINIT_NAME}.iso"
-echo "📦 Cloning golden image..."
-cp "$GOLDEN_DISK" "$CLONE_DISK"
-cp "${CLOUDINIT_NAME}.iso" "$CLONE_CLOUDINIT"
+if [[ ! -f "maas-golden.qcow2" ]]; then
+	echo "Failed to extract golden image, critical error"
+	exit 1
+fi
+
+
+if [[ ! -f "$GOLDEN_DISK" ]] ; then
+    echo "❌ Golden image not found in $GOLDEN_DISK"
+    MODIFY_IMAGE=true
+elif ! diff -q "$GOLDEN_DISK" "$PWD/${VM_NAME}.qcow2" &>/dev/null ; then
+    echo "❌ Golden image is newer than $GOLDEN_DISK"
+    MODIFY_IMAGE=true
+fi
+
+if [[  "$MODIFY_IMAGE" == true  ]]; then
+    CLONE_DISK="$HOME/.local/share/libvirt/images/${VM_NAME}.qcow2"
+    CLONE_CLOUDINIT="$HOME/.local/share/libvirt/images/${CLOUDINIT_NAME}.iso"
+    echo "📦 Copying golden image..."
+    cp -f "$(basename $GOLDEN_DISK)" "$CLONE_DISK"
+fi
+
+{
+	$RUN_PRG virsh undefine maas-dev --nvram
+	$RUN_PRG virsh destroy maas-dev
+} &>/dev/null
 
 echo "🚀 Creating VM from golden image..."
 $RUN_PRG virt-install \
@@ -28,13 +48,13 @@ $RUN_PRG virt-install \
     --name maas-dev \
     --memory 4096 \
     --vcpus 4 \
-    --disk path=/var/home/egb2/.local/share/libvirt/images/maas-dev.qcow2,format=qcow2 \
-    --cdrom /var/home/egb2/.local/share/libvirt/images/cloud-init.iso \
+    --disk path=/var/home/egb2/.local/share/libvirt/images/maas-golden.qcow2,format=qcow2 \
+    --cdrom /var/home/egb2/.local/share/libvirt/images/cloudinit.iso \
     --import \
     --os-variant ubuntunoble \
     --boot loader=/usr/share/edk2/ovmf/OVMF_CODE.fd,loader_ro=yes,loader_type=pflash \
     --graphics vnc,password=1234 \
-    --network user,model=virtio \
+    --qemu-commandline="-netdev user,id=net1,hostfwd=tcp:127.0.0.1:2222-:22,hostfwd=tcp:127.0.0.1:5240-:5240" \
     --virt-type kvm \
     --autoconsole graphical
 
