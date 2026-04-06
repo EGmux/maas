@@ -2,7 +2,7 @@ source "qemu" "lvm" {
   boot_command    = ["<wait>e<wait5>", "<down><wait><down><wait><down><wait2><end><wait5>", "<bs><bs><bs><bs><wait>autoinstall ipv6.disable=1 ---<wait><f10>"]
   boot_wait       = "2s"
   cpus            = 2
-  disk_size       = "8G"
+  disk_size       = "40G"
   format          = "raw"
   headless        = var.headless
   http_directory  = var.http_directory
