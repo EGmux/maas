@@ -48,11 +48,11 @@ $RUN_PRG virt-install \
     --name maas-dev \
     --memory 4096 \
     --vcpus 4 \
-    --disk path=/var/home/egb2/.local/share/libvirt/images/maas-golden.qcow2,format=qcow2 \
-    --cdrom /var/home/egb2/.local/share/libvirt/images/cloudinit.iso \
+    --disk path=$HOME/.local/share/libvirt/images/maas-golden.qcow2,format=qcow2 \
+    --cdrom $HOME/.local/share/libvirt/images/cloud-init.iso \
     --import \
     --os-variant ubuntunoble \
-    --boot loader=/usr/share/edk2/ovmf/OVMF_CODE.fd,loader_ro=yes,loader_type=pflash \
+    --boot loader=/usr/share/OVMF/OVMF_CODE_4M.fd,loader_ro=yes,loader_type=pflash \
     --graphics vnc,password=1234 \
     --qemu-commandline="-netdev user,id=net1,hostfwd=tcp:127.0.0.1:2222-:22,hostfwd=tcp:127.0.0.1:5240-:5240" \
     --virt-type kvm \
