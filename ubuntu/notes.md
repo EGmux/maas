@@ -53,4 +53,7 @@ Result: Dual-boot without modifying MAAS core. 🔧
 ## Scratch
 
 A possible prototype startpoint
+
+### To enable network in virt-install (silverblue)
+- run systemctl enable --now libvirtd (maybe ubuntu aswell?)
 ---
