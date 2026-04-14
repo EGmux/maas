@@ -58,6 +58,12 @@ build {
     destination = "/tmp/99_maas_provision.cfg"
   }
 
+  # Copy maas patch
+  provisioner "file" {
+    source      = "${path.root}/scripts/maas_golden.patch"
+    destination = "/tmp/maas_golden.patch"
+  }
+
   # Run all setup scripts
   provisioner "shell" {
     environment_vars = [

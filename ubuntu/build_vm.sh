@@ -34,7 +34,7 @@ if [[  "$MODIFY_IMAGE" == true  ]]; then
     export CLONE_DISK="/var/lib/libvirt/images/${VM_NAME}.qcow2"
     CLONE_CLOUDINIT="/var/lib/libvirt/images/${CLOUDINIT_NAME}.iso"
     echo "📦 Copying golden image..."
-    su egb2 -c 'cp -f "$(basename "$GOLDEN_DISK")" "$CLONE_DISK"'
+    $RUN_PRG sudo -S cp -f "$(basename "$GOLDEN_DISK")" "$CLONE_DISK"
 fi
 
 {
@@ -43,6 +43,22 @@ fi
 } &>/dev/null
 
 echo "🚀 Creating VM from golden image..."
+
+# $RUN_PRG qemu-system-x86_64 \
+# 	-name maas-dev \
+# 	-m 4096 \
+# 	-smp 4 \
+# 	-drive file=/var/lib/libvirt/images/maas-golden.qcow2,format=qcow2,if=virtio \
+# 	-cdrom /var/lib/libvirt/images/cloud-init.iso \
+# 	-bios /usr/share/edk2/ovmf/OVMF_CODE.fd \
+# 	-vnc :0,password=on \
+# 	-display gtk \
+# 	-netdev tap,fd=3,id=net0 \
+# 	-device virtio-net-pci,netdev=net0,mac=${REAL_MAC} \
+# 	-machine type=pc,accel=kvm \
+# 	-cpu host \
+# 	3<>/dev/tap${TAPNUM}
+
 $RUN_PRG virt-install \
     --connect=qemu:///system \
     --name maas-dev \
@@ -58,6 +74,8 @@ $RUN_PRG virt-install \
     --network network=default \
     --virt-type kvm \
     --autoconsole graphical
+
+
 
 echo "✅ VM created: $VM_NAME"
 echo ""

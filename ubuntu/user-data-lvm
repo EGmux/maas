@@ -33,9 +33,6 @@ autoinstall:
         dhcp4: true
         optional: true
 
-  packages:
-     - make
-
   package_update: true
   package_upgrade: true
 
