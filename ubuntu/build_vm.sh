@@ -7,7 +7,7 @@ if [[ $RUN_PRG =~ /flatpak-spawn$ ]]; then
     RUN_PRG="$RUN_PRG --host"
 fi
 
-GOLDEN_DISK="$HOME/.local/share/libvirt/images/maas-golden.qcow2"
+export GOLDEN_DISK="/var/lib/libvirt/images/maas-golden.qcow2"
 VM_NAME="maas-golden"
 MODIFY_IMAGE=false
 
@@ -31,38 +31,36 @@ elif ! diff -q "$GOLDEN_DISK" "$PWD/${VM_NAME}.qcow2" &>/dev/null ; then
 fi
 
 if [[  "$MODIFY_IMAGE" == true  ]]; then
-    CLONE_DISK="$HOME/.local/share/libvirt/images/${VM_NAME}.qcow2"
-    CLONE_CLOUDINIT="$HOME/.local/share/libvirt/images/${CLOUDINIT_NAME}.iso"
+    export CLONE_DISK="/var/lib/libvirt/images/${VM_NAME}.qcow2"
+    CLONE_CLOUDINIT="/var/lib/libvirt/images/${CLOUDINIT_NAME}.iso"
     echo "📦 Copying golden image..."
-    cp -f "$(basename $GOLDEN_DISK)" "$CLONE_DISK"
+    su egb2 -c 'cp -f "$(basename "$GOLDEN_DISK")" "$CLONE_DISK"'
 fi
 
 {
-	$RUN_PRG virsh undefine maas-dev --nvram
-	$RUN_PRG virsh destroy maas-dev
+	$RUN_PRG virsh --connect qemu:///system undefine maas-dev --nvram
+	$RUN_PRG virsh --connect qemu:///system destroy maas-dev
 } &>/dev/null
 
 echo "🚀 Creating VM from golden image..."
 $RUN_PRG virt-install \
-    --connect=qemu:///session \
+    --connect=qemu:///system \
     --name maas-dev \
     --memory 4096 \
     --vcpus 4 \
-    --disk path=$HOME/.local/share/libvirt/images/maas-golden.qcow2,format=qcow2 \
-    --cdrom $HOME/.local/share/libvirt/images/cloud-init.iso \
+    --disk path=/var/lib/libvirt/images/maas-golden.qcow2,format=qcow2 \
+    --cdrom /var/lib/libvirt/images/cloud-init.iso \
     --import \
     --os-variant ubuntunoble \
-    --boot loader=/usr/share/OVMF/OVMF_CODE_4M.fd,loader_ro=yes,loader_type=pflash \
+    --boot loader=/usr/share/edk2/ovmf/OVMF_CODE.fd,loader_ro=yes,loader_type=pflash \
     --graphics vnc,password=1234 \
-    --qemu-commandline="-netdev user,id=net1,hostfwd=tcp:127.0.0.1:2222-:22,hostfwd=tcp:127.0.0.1:5240-:5240" \
+    --check all=off \
+    --network network=default \
     --virt-type kvm \
     --autoconsole graphical
 
 echo "✅ VM created: $VM_NAME"
 echo ""
 echo "📡 VM Network (NAT):"
-echo "   VM gets IP: 10.0.2.15 (via DHCP)"
-echo "   Internet: works through host"
-echo ""
 echo "🔌 To SSH into VM, add port forwarding to qemu command"
 echo "   Or use: virsh --connect=qemu:///session console $VM_NAME"

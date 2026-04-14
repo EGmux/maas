@@ -1,0 +1,54 @@
+diff --git a/profiles/maas-region-profile.yml b/profiles/maas-region-profile.yml
+index 395e615..89b4995 100644
+--- a/profiles/maas-region-profile.yml
++++ b/profiles/maas-region-profile.yml
+@@ -1,7 +1,7 @@
+ config:
+     raw.idmap: |
+-        REPLACE_WITH_YOUR_UID
+-        REPLACE_WITH_YOUR_GID
++        1000
++        1000
+     user.vendor-data: |
+         #cloud-config
+         packages:
+@@ -16,7 +16,7 @@ description: Build environment for MAAS
+ devices:
+     work:
+         type: disk
+-        source: REPLACE_WITH_MAAS_SOURCE
++        source: https://github.com/EGmux/maas.git
+         path: /work
+     eth0:
+         type: nic
+diff --git a/setup-dev-env.sh b/setup-dev-env.sh
+index b9e7645..4faa468 100755
+--- a/setup-dev-env.sh
++++ b/setup-dev-env.sh
+@@ -103,7 +103,7 @@ setup_code() {
+   echo "################################"
+   echo "Cloning code into ${maas_src}..."
+   mkdir -p ${maas_src} && cd ${maas_src}
+-  git clone --origin upstream https://git.launchpad.net/maas . --recurse-submodules
++  git clone --origin upstream https://github.com/EGmux/maas.git . --recurse-submodules
+   echo "..done"
+   if [ ${MAAS_LAUNCHPAD_ID} != "" ]; then
+     echo "Adding your origin remote git+ssh://${MAAS_LAUNCHPAD_ID}@git.launchpad.net/~${MAAS_LAUNCHPAD_ID}/maas"
+@@ -224,7 +224,7 @@ config:
+         runcmd:
+         - cat /dev/zero | ssh-keygen -q -N ""
+         ssh_authorized_keys:
+-        - $(cat ${HOME}/.ssh/id_rsa.pub | cut -d' ' -f1-2)
++        - $(cat ${HOME}/.ssh/id_ed25519.pub | cut -d' ' -f1-2)
+ description: Build environment for MAAS
+ devices:
+     work:
+@@ -260,7 +260,7 @@ configure_container() {
+   echo "################################################################"
+   echo "SSHing into ${MAAS_CONTAINER_NAME} (${container_ip}) development and setting it up"
+   # could pass vars in there with ssh ubuntu@${container_ip} 'bash -s' < setup-region-via-ssh.sh var1 var2 ...
+-  ssh -o "StrictHostKeyChecking no" ubuntu@${container_ip}\
++  ssh -i ${HOME}/.ssh/id_ed25519 -o "StrictHostKeyChecking no" ubuntu@${container_ip}\
+       MAAS_CONTROL_IP_RANGE=${MAAS_CONTROL_IP_RANGE}\
+       MAAS_MANAGEMENT_IP_RANGE=${MAAS_MANAGEMENT_IP_RANGE}\
+       MAAS_IPV6_IP_RANGE=${MAAS_IPV6_IP_RANGE}\
