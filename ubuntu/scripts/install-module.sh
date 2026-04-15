@@ -12,6 +12,6 @@ chmod 644 /etc/cloud/cloud.cfg.d/99_maas_provision.cfg
 systemctl disable named || true
 # Run the module
 cloud-init single --name cc_maas_provision && \
-	cd $HOME/maas-dev-setup && git apply /tmp/maas_golden.patch && ./setup-dev-env.sh --ok 
+	cd $HOME/maas-dev-setup && git apply /tmp/maas_golden.patch 
 
 echo "✅ Custom cloud-init module installed"
