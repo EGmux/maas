@@ -30,7 +30,7 @@ from maasserver.forms import MachineForm
 from maasserver.models.node import Node
 from maasserver.models.nodemetadata import NodeMetadata
 from maasserver.node_status import  NODE_TRANSITIONS
-from maasserver.utils.orm import locks
+from maasserver import locks
 from maasserver.multiboot_deploy import (
     compose_os_config,
     delete_layout,
