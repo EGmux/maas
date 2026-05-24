@@ -26,7 +26,7 @@ from maasserver.exceptions import (
     NodeStateViolation,
 )
 from maasserver.permissions import NodePermission
-from maasserver.forms.machine import MachineForm
+from maasserver.forms import MachineForm
 from maasserver.models.node import Node
 from maasserver.models.nodemetadata import NodeMetadata
 from maasserver.node_status import NODE_STATUS_CHOICES_DICT, NODE_TRANSITIONS
