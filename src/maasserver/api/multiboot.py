@@ -16,7 +16,7 @@ __all__ = [
 
 import logging
 
-from maasserver.api.operations import operation
+from maasserver.api.support import operation
 from maasserver.enum import NodePermission, NODE_STATUS
 from maasserver.exceptions import (
     MAASAPIBadRequest,
