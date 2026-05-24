@@ -16,14 +16,16 @@ __all__ = [
 
 import logging
 
+from django.core.exceptions import PermissionDenied
+
 from maasserver.api.support import operation
-from maasserver.enum import NodePermission, NODE_STATUS
+from maasserver.enum import NODE_STATUS
 from maasserver.exceptions import (
     MAASAPIBadRequest,
     MAASAPIValidationError,
     NodeStateViolation,
-    PermissionDenied,
 )
+from maasserver.permissions import NodePermission
 from maasserver.forms.machine import MachineForm
 from maasserver.models.node import Node
 from maasserver.models.nodemetadata import NodeMetadata
@@ -40,7 +42,6 @@ from maasserver.multiboot_deploy import (
 )
 
 maaslog = logging.getLogger("maas")
-
 
 class MultiBootMixin:
     """Mixin that adds multi-boot operations to MachineHandler.
