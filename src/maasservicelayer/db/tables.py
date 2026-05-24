@@ -1105,6 +1105,79 @@ MDNSTable = Table(
     Index("maasserver_mdns_interface_id_ef297041", "interface_id"),
 )
 
+MultiBootDeploymentTable = Table(
+    "maasserver_multibootdeployment",
+    METADATA,  # noqa: F821 — defined in tables.py
+    Column("id", BigInteger, Identity(), primary_key=True),
+    Column("created", DateTime(timezone=True), nullable=False),
+    Column("updated", DateTime(timezone=True), nullable=False),
+    Column("default_os_index", Integer, nullable=False),
+    Column("boot_timeout", Integer, nullable=False),
+    Column(
+        "node_id",
+        BigInteger,
+        ForeignKey(
+            "maasserver_node.id", deferrable=True, initially="DEFERRED"
+        ),
+        nullable=False,
+        unique=True,
+    ),
+)
+
+MultiBootOSTable = Table(
+    "maasserver_multibootos",
+    METADATA,  # noqa: F821 — defined in tables.py
+    Column("id", BigInteger, Identity(), primary_key=True),
+    Column("created", DateTime(timezone=True), nullable=False),
+    Column("updated", DateTime(timezone=True), nullable=False),
+    Column("osystem", String(31), nullable=False),
+    Column("distro_series", String(31), nullable=False),
+    Column("hwe_kernel", String(31), nullable=True),
+    Column("architecture", String(31), nullable=True),
+    Column("priority", Integer, nullable=False),
+    Column(
+        "deployment_id",
+        BigInteger,
+        ForeignKey(
+            "maasserver_multibootdeployment.id",
+            deferrable=True, initially="DEFERRED",
+        ),
+        nullable=False,
+    ),
+    Column(
+        "boot_disk_id",
+        BigInteger,
+        ForeignKey(
+            "maasserver_blockdevice.id",
+            deferrable=True, initially="DEFERRED",
+        ),
+        nullable=True,
+    ),
+    UniqueConstraint("deployment_id", "priority"),
+    Index("maasserver_multibootos_deployment_id", "deployment_id"),
+)
+
+MultiBootPartitionTable = Table(
+    "maasserver_multibootpartition",
+    METADATA,  # noqa: F821 — defined in tables.py
+    Column("id", BigInteger, Identity(), primary_key=True),
+    Column("mount_point", String(255), nullable=False),
+    Column("size", BigInteger, nullable=False),
+    Column("fstype", String(31), nullable=False),
+    Column(
+        "os_entry_id",
+        BigInteger,
+        ForeignKey(
+            "maasserver_multibootos.id",
+            deferrable=True, initially="DEFERRED",
+        ),
+        nullable=False,
+    ),
+    UniqueConstraint("os_entry_id", "mount_point"),
+    Index("maasserver_multibootpartition_os_entry_id", "os_entry_id"),
+)
+
+
 PartitionTable = Table(
     "maasserver_partition",
     METADATA,

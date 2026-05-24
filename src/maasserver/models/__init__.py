@@ -44,6 +44,9 @@ __all__ = [
     "LicenseKey",
     "Machine",
     "MDNS",
+    "MultiBootDeployment",
+    "MultiBootOS",
+    "MultiBootPartition",
     "Neighbour",
     "Node",
     "NodeConfig",
@@ -165,6 +168,11 @@ from maasserver.models.iprange import IPRange
 from maasserver.models.largefile import LargeFile
 from maasserver.models.licensekey import LicenseKey
 from maasserver.models.mdns import MDNS
+from maasserver.models.multiboot import (
+    MultiBootDeployment,
+    MultiBootOS,
+    MultiBootPartition,
+)
 from maasserver.models.neighbour import Neighbour
 from maasserver.models.node import (
     Controller,

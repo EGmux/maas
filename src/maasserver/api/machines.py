@@ -30,6 +30,7 @@ import yaml
 from maascommon.fields import MAC_FIELD_RE
 from maasserver import locks
 from maasserver.api.logger import maaslog
+from maasserver.api.multiboot import MultiBootMixin
 from maasserver.api.nodes import (
     AnonNodeHandler,
     AnonNodesHandler,
@@ -93,6 +94,7 @@ from maasserver.node_constraint_filter_forms import (
     nodes_by_interface,
     nodes_by_storage,
 )
+from maasserver.api.multiboot import MultiBootMixin
 from maasserver.node_status import NODE_TRANSITIONS
 from maasserver.permissions import NodePermission, PodPermission
 from maasserver.preseed import get_curtin_merged_config
@@ -374,7 +376,7 @@ def get_allocated_composed_machine(
     return machine, storage, interfaces
 
 
-class MachineHandler(NodeHandler, WorkloadAnnotationsMixin, PowerMixin):
+class MachineHandler(MultiBootMixin,NodeHandler, WorkloadAnnotationsMixin, PowerMixin):
     """
     Manage an individual machine.
 
