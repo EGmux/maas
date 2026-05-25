@@ -39,7 +39,8 @@ from maasserver.models.multiboot import (
 )
 from maasserver.models.physicalblockdevice import PhysicalBlockDevice
 from maasserver.preseed import get_curtin_merged_config
-from maasserver.node_status import NODE_STATUS_CHOICES_DICT, NODE_TRANSITIONS
+from maasserver.enum import NODE_STATUS_CHOICES_DICT
+from maasserver.node_status import NODE_TRANSITIONS
 
 maaslog = logging.getLogger("maas")
 
