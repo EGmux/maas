@@ -65,6 +65,11 @@ from maasservicelayer.db.repositories.legacybootsourceselections import (
 )
 from maasservicelayer.db.repositories.machines import MachinesRepository
 from maasservicelayer.db.repositories.mdns import MDNSRepository
+from maasservicelayer.db.repositories.multiboot import (
+    MultiBootDeploymentRepository,
+    MultiBootOSRepository,
+    MultiBootPartitionRepository,
+)
 from maasservicelayer.db.repositories.neighbours import NeighboursRepository
 from maasservicelayer.db.repositories.nodegrouptorackcontrollers import (
     NodeGroupToRackControllersRepository,
@@ -173,6 +178,11 @@ from maasservicelayer.services.legacybootsourceselections import (
 from maasservicelayer.services.machines import MachinesService
 from maasservicelayer.services.machines_v2 import MachinesV2Service
 from maasservicelayer.services.mdns import MDNSService
+from maasservicelayer.services.multiboot import (
+        MultiBootDeploymentService,
+        MultiBootOSService,
+        MultiBootPartitionService,
+)
 from maasservicelayer.services.msm import MSMService
 from maasservicelayer.services.neighbours import NeighboursService
 from maasservicelayer.services.nodegrouptorackcontrollers import (
@@ -284,6 +294,9 @@ class ServiceCollectionV3:
     machines: MachinesService
     machines_v2: MachinesV2Service
     mdns: MDNSService
+    multiboot_oses: MultiBootOSService
+    multiboot_partitions: MultiBootPartitionService
+    multiboot_deployments: MultiBootDeploymentService
     msm: MSMService
     neighbours: NeighboursService
     nodegrouptorackcontrollers: NodeGroupToRackControllersService
@@ -707,6 +720,20 @@ class ServiceCollectionV3:
         )
         services.mdns = MDNSService(
             context=context, mdns_repository=MDNSRepository(context)
+        )
+        services.multiboot_oses = MultiBootOSService(
+                context = context,
+                multiboot_os_repository=MultiBootOSRepository(context),
+        )
+        services.multiboot_partitions = MultiBootPartitionService(
+                context = context,
+                multiboot_partition_repository=MultiBootPartitionRepository(context),
+        )
+        services.multiboot_deployments = MultiBootDeploymentService(
+                context = context,
+                multiboot_deployment_repository=MultiBootDeploymentRepository(context),
+                multiboot_os_service=services.multiboot_oses,
+                multiboot_partition_service=services.multiboot_partitions,
         )
         services.bootstraptokens = BootstrapTokensService(
             context=context,

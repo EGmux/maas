@@ -53,17 +53,6 @@ def process_revision_directives(context, revision, directives):
     migration_script.rev_id = "{0:04}".format(new_rev_id)
 
 
-def do_run_migrations(connection: Connection) -> None:
-    context.configure(
-        connection=connection,
-        target_metadata=target_metadata,
-        process_revision_directives=process_revision_directives,
-        include_object=include_object,
-    )
-    with context.begin_transaction():
-        context.run_migrations()
-
-
 # Ignore tables not in SQLAlchemy metadata and exclude views
 def include_object(object, name, type_, reflected, compare_to):
     # Exclude database views from autogeneration
@@ -73,11 +62,23 @@ def include_object(object, name, type_, reflected, compare_to):
         "maasserver_routable_pairs",
         "maasserver_podhost",
         "maasserver_ui_subnet_view",
+        "maasserver_usergroup_members_view",  # ✅ Added to prevent future autogenerate table hijacking
     }
 
     if type_ == "table":
         return (name not in VIEW_NAMES) and (name in target_metadata.tables)
     return True
+
+
+def do_run_migrations(connection: Connection) -> None:
+    context.configure(
+        connection=connection,
+        target_metadata=target_metadata,
+        process_revision_directives=process_revision_directives,
+        include_object=include_object,
+    )
+    with context.begin_transaction():
+        context.run_migrations()
 
 
 async def run_async_migrations() -> None:
@@ -123,6 +124,7 @@ def run_migrations_offline() -> None:
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
         process_revision_directives=process_revision_directives,
+        include_object=include_object,  # ✅ Added to offline mode as well for safety
     )
 
     with context.begin_transaction():
