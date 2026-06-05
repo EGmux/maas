@@ -1141,6 +1141,7 @@ MultiBootOSTable = Table(
         ForeignKey(
             "maasserver_multibootdeployment.id",
             deferrable=True, initially="DEFERRED",
+            ondelete="CASCADE",
         ),
         nullable=False,
     ),
@@ -1161,6 +1162,8 @@ MultiBootPartitionTable = Table(
     "maasserver_multibootpartition",
     METADATA,  # noqa: F821 — defined in tables.py
     Column("id", BigInteger, Identity(), primary_key=True),
+    Column("created", DateTime(timezone=True), nullable=False),
+    Column("updated", DateTime(timezone=True), nullable=False),
     Column("mount_point", String(255), nullable=False),
     Column("size", BigInteger, nullable=False),
     Column("fstype", String(31), nullable=False),
@@ -1170,6 +1173,7 @@ MultiBootPartitionTable = Table(
         ForeignKey(
             "maasserver_multibootos.id",
             deferrable=True, initially="DEFERRED",
+            ondelete="CASCADE",
         ),
         nullable=False,
     ),

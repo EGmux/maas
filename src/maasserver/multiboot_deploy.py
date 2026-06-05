@@ -16,12 +16,19 @@ __all__ = [
     "load_layout",
     "store_layout",
     "delete_layout",
+    "build_storage_config",
     "generate_multi_boot_installer",
 ]
 
+import re
 import yaml
 from typing import Optional
 import logging
+
+from curtin.config import merge_config
+from curtin.pack import pack
+
+from maasserver.preseed import get_curtin_installer_url
 
 from django.db import transaction
 
@@ -41,6 +48,7 @@ from maasserver.models.physicalblockdevice import PhysicalBlockDevice
 from maasserver.preseed import get_curtin_merged_config
 from maasserver.enum import NODE_STATUS_CHOICES_DICT
 from maasserver.node_status import NODE_TRANSITIONS
+from maasserver.sqlalchemy import service_layer
 
 maaslog = logging.getLogger("maas")
 
@@ -90,11 +98,14 @@ def read_layout_from_request(request) -> dict:
     MAASAPIBadRequest
         If no layout is provided or the content cannot be parsed.
     """
-    # 1. Try request.data (file upload)
+    # 1. Try request.data (file upload or string)
     layout_file = request.data.get("layout")
     if layout_file is not None:
         try:
-            raw = layout_file.read()
+            if hasattr(layout_file, 'read'):
+                raw = layout_file.read()
+            else:
+                raw = layout_file
             return yaml.safe_load(raw)
         except yaml.YAMLError as exc:
             raise MAASAPIBadRequest(
@@ -364,31 +375,288 @@ def compose_os_config(
     return yaml.safe_dump(merged)
 
 
+def _parse_size(size_str: str | int) -> int:
+    if isinstance(size_str, int):
+        return size_str
+    size_str = size_str.strip()
+    units = {
+        "B": 1,
+        "K": 1024,
+        "M": 1024**2,
+        "G": 1024**3,
+        "T": 1024**4,
+        "P": 1024**5,
+    }
+    if size_str[-1].isalpha():
+        unit = size_str[-1].upper()
+        number = float(size_str[:-1].strip())
+        return int(number * units.get(unit, 1))
+    return int(float(size_str))
+
+
+def build_storage_config(layout: dict) -> dict:
+    """Build the master curtin storage config for all OSes.
+
+    Produces a curtin ``storage`` block (``version: 1`` + ``config`` list)
+    with actions for: shared disk, shared ESP (auto-injected), and per-OS
+    partitions. Mount actions are created **only** for the first Linux OS
+    (so ``block-meta --mode=custom`` mounts them in Phase 1).
+
+    The user's ``/boot/efi`` partition entries are silently skipped —
+    the shared ESP replaces them.
+
+    Called **once** (not per-OS). The output is merged into ``config-000.cfg``.
+
+    Parameters
+    ----------
+    layout : dict
+        Canonical layout dict with ``boot`` and ``oses`` keys,
+        as returned by ``load_layout()``.
+
+    Returns
+    -------
+    dict
+        A curtin storage config dict::
+
+            {"version": 1, "config": [...]}
+    """
+    config = []
+    oses = layout.get(_OSES_KEY, [])
+
+    # 1. Shared disk
+    config.append({
+        "id": "sda",
+        "type": "disk",
+        "ptable": "gpt",
+    })
+
+    # 2. Shared ESP — always auto-injected as first partition.
+    #    User-specified /boot/efi entries are skipped (handled below).
+    config.append({
+        "id": "esp",
+        "type": "partition",
+        "device": "sda",
+        "size": "512M",
+        "flag": "boot",
+    })
+    config.append({
+        "id": "esp_fs",
+        "type": "format",
+        "volume": "esp",
+        "fstype": "fat32",
+    })
+    config.append({
+        "id": "esp_mnt",
+        "type": "mount",
+        "device": "esp_fs",
+        "path": "/boot/efi",
+    })
+
+    # 3. Per-OS partitions
+    part_num = 2  # sda2 onward (sda1 = ESP)
+    first_linux = True
+
+    for i, entry in enumerate(oses):
+        prefix = f"os{i}"
+        is_windows = entry.get(_OSYSTEM_KEY, "") == "windows"
+        partitions = entry.get(_PARTITIONS_KEY, {})
+
+        for mount_point, part_spec in partitions.items():
+            # Skip /boot/efi — shared ESP handles it
+            if mount_point == "/boot/efi":
+                continue
+
+            part_id = f"{prefix}_p{part_num}"
+
+            # Partition action
+            config.append({
+                "id": part_id,
+                "type": "partition",
+                "device": "sda",
+                "size": part_spec["size"],
+            })
+
+            # Format action
+            fs_id = f"{part_id}_fs"
+            config.append({
+                "id": fs_id,
+                "type": "format",
+                "volume": part_id,
+                "fstype": part_spec[_FSTYPE_KEY],
+            })
+
+            # Mount action — only for the first Linux OS
+            if not is_windows and first_linux:
+                config.append({
+                    "id": f"{part_id}_mnt",
+                    "type": "mount",
+                    "device": fs_id,
+                    "path": mount_point,
+                })
+
+            part_num += 1
+
+        # Mark first Linux as done after processing its partitions
+        if not is_windows and first_linux:
+            first_linux = False
+
+    return {"version": 1, "config": config}
+
+
+import textwrap
+
+
+def _generate_orchestrator(
+    oses: list[dict],
+    urls: list[str],
+    default_index: int,
+    timeout: int,
+    system_id: str,
+    metadata_url: str,
+) -> str:
+    """Generate the multi-boot orchestrator bash script.
+
+    Returns a ``multi-boot.sh`` script that runs in the MAAS ephemeral
+    initrd environment. Called by ``generate_multi_boot_installer()``
+    which bakes the result into a self-extracting archive via ``pack()``.
+
+    Parameters
+    ----------
+    oses : list[dict]
+        The ``oses`` list from the layout dict.
+    urls : list[str]
+        Resolved image URLs (prefix stripped), one per OS entry.
+    default_index : int
+        Index of the default OS in the GRUB menu.
+    timeout : int
+        GRUB menu timeout in seconds.
+    system_id : str
+        Machine system_id (baked in for netboot_off URL).
+    metadata_url : str
+        MAAS metadata service URL (baked in for netboot_off).
+
+    Returns
+    -------
+    str
+        The complete bash orchestrator script.
+    """
+    os_count = len(oses)
+    os_types = " ".join('"%s"' % e["osystem"] for e in oses)
+    url_list = " ".join('"%s"' % u for u in urls)
+
+    return textwrap.dedent('''\
+    #!/bin/bash
+    set -euo pipefail
+
+    # ── Baked-in metadata ──
+    OS_COUNT=%s
+    OSYSTEM=(%s)
+    IMAGE_URLS=(%s)
+    DEFAULT_OS=%s
+    TIMEOUT=%s
+    SYSTEM_ID="%s"
+    MAAS_METADATA_URL="%s"
+
+    # ── Phase 1: Partition once ──
+    echo "[multiboot] Phase 1: Partition all disks"
+    TARGET_MOUNT_POINT=/target/os0 \\
+    curtin block-meta --mode=custom --config configs/config-000.cfg
+
+    # ── Phase 2: Install each OS ──
+    for ((i=0; i<OS_COUNT; i++)); do
+        echo "[multiboot] Installing OS ${i} (${OSYSTEM[$i]})"
+
+        if [[ "${OSYSTEM[$i]}" == "windows" ]]; then
+            # ── Windows: losetup + dd + zcat ──
+            PART_NUM=$((i + 2))
+            START=$(cat "/sys/block/sda/sda${PART_NUM}/start")
+            SIZE=$(cat "/sys/block/sda/sda${PART_NUM}/size")
+            losetup -o $((START * 512)) --sizelimit $((SIZE * 512)) \\
+                --show /dev/sda /dev/loop0
+            wget "${IMAGE_URLS[$i]}" --progress=dot:mega -O - \\
+                | zcat | dd bs=4M of=/dev/loop0
+            losetup -d /dev/loop0
+            partprobe /dev/sda
+            udevadm settle
+        else
+            # ── Linux: extract + curthooks ──
+            if [[ $i -ne 0 ]]; then
+                PART_NUM=$((i + 2))
+                mkdir -p "/target/os${i}"
+                mount "/dev/sda${PART_NUM}" "/target/os${i}"
+            fi
+            curtin extract --config "configs/config-${i}.cfg" \\
+                --target "/target/os${i}" "${IMAGE_URLS[$i]}"
+            curtin curthooks --config "configs/config-${i}.cfg" \\
+                --target "/target/os${i}"
+        fi
+    done
+
+    # ── Phase 3: GRUB handled by curthooks' setup_boot() ──
+
+    # ── Phase 4: Signal completion ──
+    echo "[multiboot] Phase 4: netboot_off"
+    wget --post-data="" -q -O /dev/null \\
+        "http://${MAAS_METADATA_URL}/MAAS/metadata/latest/${SYSTEM_ID}/?op=netboot_off"
+
+    echo "[multiboot] Done. Rebooting."
+    ''' % (os_count, os_types, url_list, default_index, timeout, system_id, metadata_url))
+
+
 def load_layout(machine) -> Optional[dict]:
     """Read layout from models into the canonical dict format.
-
+    
     Parameters
     ----------
     machine : Node
         The machine whose layout to load.
-
+    
     Returns
     -------
     dict or None
         ``None`` if no layout is configured.
         Otherwise a dict with the ``boot`` and ``oses`` keys.
     """
-    # TODO: Query MultiBootDeployment -> MultiBootOS -> MultiBootPartition
-    #       and reconstruct the canonical dict.
-    raise NotImplementedError
+    deployment, os_entries, _ = service_layer.services.multiboot_deployments.get_layout(
+        machine.id
+    )
+    if deployment is None:
+        return None
+    
+    oses_list = []
+    for os_entry, partitions in os_entries:
+        partitions_dict = {}
+        for part in partitions:
+            partitions_dict[part.mount_point] = {
+                "size": part.size,
+                "fstype": part.fstype,
+            }
+        os_dict = {
+            "osystem": os_entry.osystem,
+            "distro_series": os_entry.distro_series,
+            "hwe_kernel": os_entry.hwe_kernel,
+            "architecture": os_entry.architecture,
+            "priority": os_entry.priority,
+            "boot_disk_id": os_entry.boot_disk_id,
+            "partitions": partitions_dict,
+        }
+        oses_list.append(os_dict)
+    
+    return {
+        "boot": {
+            "default": deployment.default_os_index,
+            "timeout": deployment.boot_timeout,
+        },
+        "oses": oses_list,
+    }
 
 
 @transaction.atomic
 def store_layout(node: Node, layout_data: dict) -> None:
     """Write layout dict into MultiBootDeployment + related models.
-
+    
     Replaces any existing layout for this node atomically.
-
+    
     Parameters
     ----------
     node : Node
@@ -396,11 +664,34 @@ def store_layout(node: Node, layout_data: dict) -> None:
     layout_data : dict
         Canonical layout dict with ``boot`` and ``oses`` keys.
     """
-    # TODO: Delete existing MultiBootDeployment if present.
-    #       Create new MultiBootDeployment.
-    #       For each OS entry, create MultiBootOS.
-    #       For each partition in each OS, create MultiBootPartition.
-    raise NotImplementedError
+    boot = layout_data.get("boot", {})
+    oses = layout_data.get("oses", [])
+    
+    oses_data = []
+    for i, os_entry in enumerate(oses):
+        partitions_data = []
+        for mount_point, part_config in os_entry.get("partitions", {}).items():
+            partitions_data.append({
+                "mount_point": mount_point,
+                "size": _parse_size(part_config["size"]),
+                "fstype": part_config.get("fstype", "ext4"),
+            })
+        oses_data.append({
+            "osystem": os_entry["osystem"],
+            "distro_series": os_entry["distro_series"],
+            "hwe_kernel": os_entry.get("hwe_kernel"),
+            "architecture": os_entry.get("architecture"),
+            "priority": os_entry.get("priority", i),
+            "boot_disk_id": os_entry.get("boot_disk_id"),
+            "partitions": partitions_data,
+        })
+    
+    service_layer.services.multiboot_deployments.store_layout(
+        node_id=node.id,
+        default_os_index=boot.get("default", 0),
+        boot_timeout=boot.get("timeout", 5),
+        oses_data=oses_data,
+    )
 
 
 def generate_multi_boot_installer(
@@ -408,8 +699,10 @@ def generate_multi_boot_installer(
 ) -> str:
     """Generate the multi-boot wrapper script.
 
-    The script orchestrates curtin N times — once per OS in the
-    layout — in a single ephemeral environment session.
+    Produces a self-extracting ``#!/bin/sh`` archive (via ``curtin.pack.pack()``)
+    containing the bundled curtin Python library, N per-OS curtin YAML configs,
+    and an orchestrator script (``multi-boot.sh``) that installs each OS in
+    sequence.
 
     Parameters
     ----------
@@ -420,33 +713,77 @@ def generate_multi_boot_installer(
     os_configs : list[str]
         Per-OS curtin YAML configs produced by ``compose_os_config()``.
         One per entry in ``layout["oses"]``, in the same order.
+        Storage section already stripped by ``compose_os_config()``.
 
     Returns
     -------
     str
-        The complete bash script. Stored in NodeMetadata and
-        served verbatim by the metadata service at PXE time.
+        A self-extracting shell archive (``#!/bin/sh``). Stored in
+        NodeMetadata and served verbatim by the metadata service at
+        PXE time (same contract as ``pack_install()`` output).
     """
-    # TODO: Build a bash script that:
-    #   - For each os_config in os_configs:
-    #       - Write the YAML to /tmp/os<N>.yaml
-    #       - Run: curtin extract --config /tmp/os<N>.yaml --target /target/os<N> <image-url>
-    #       - Run: curtin curthooks --config /tmp/os<N>.yaml --target /target/os<N>
-    #   - Install GRUB via curtin hook or manual grub-install
-    #   - Call netboot_off via the metadata service
-    #   Image URL resolved via get_curtin_installer_url() for each OS.
-    #   Linux vs Windows branching: Windows uses dd- images, Linux uses extract.
-    raise NotImplementedError
+    # 1. Resolve image URLs per OS entry
+    urls = []
+    for entry in layout["oses"]:
+        old_osystem = machine.osystem
+        old_series = machine.distro_series
+        try:
+            machine.osystem = entry["osystem"]
+            machine.distro_series = entry["distro_series"]
+            raw_url = get_curtin_installer_url(machine)
+        finally:
+            machine.osystem = old_osystem
+            machine.distro_series = old_series
+        # Strip known URL prefixes: "dd-gz:http://..." → "http://..."
+        # "tgz:http://..." → "http://..."
+        # "cp:///path" stays as-is (handled by orchestrator)
+        clean_url = re.sub(r'^[a-z][a-z0-9-]*:', '', raw_url)
+        urls.append(clean_url)
+
+    # 2. Build master storage config
+    master_storage = build_storage_config(layout)
+
+    # 3. Merge storage into config-000 only.
+    #    Per-OS configs (001, 002, ...) have no storage section.
+    config_yamls = []
+    for i, yaml_str in enumerate(os_configs):
+        cfg = yaml.safe_load(yaml_str)
+        if i == 0:
+            cfg = merge_config(cfg, {"storage": master_storage})
+        config_yamls.append(yaml.safe_dump(cfg))
+
+    # 4. Generate orchestrator script
+    orch = _generate_orchestrator(
+        oses=layout["oses"],
+        urls=urls,
+        default_index=layout["boot"].get("default", 0),
+        timeout=layout["boot"].get("timeout", 5),
+        system_id=machine.system_id,
+        metadata_url=str(machine.boot_cluster_ip),
+    )
+
+    # 5. Bundle via pack() — same mechanism as pack_install()
+    config_files = [
+        (f"configs/config-{i:03d}.cfg", yaml_str)
+        for i, yaml_str in enumerate(config_yamls)
+    ]
+    config_files.append(("multi-boot.sh", orch))
+
+    return pack(
+        command=["/bin/bash", "multi-boot.sh"],
+        add_files=config_files,
+    )
 
 
 def delete_layout(machine: Node) -> None:
     """Delete all multi-boot data for a machine.
-
+    
     Parameters
     ----------
     machine : Node
     """
-    # TODO: Delete MultiBootDeployment (CASCADE handles OS + partitions).
-    #       Delete all NodeMetadata with key "multi_boot_*".
-    raise NotImplementedError
+    service_layer.services.multiboot_deployments.delete_layout(machine.id)
+    NodeMetadata.objects.filter(
+        node=machine, key__startswith="multi_boot_"
+    ).delete()
 
