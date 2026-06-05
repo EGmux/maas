@@ -1,6 +1,8 @@
 # Copyright 2026 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
+from __future__ import annotations
+
 from maasservicelayer.context import Context
 from maasservicelayer.db.filters import QuerySpec
 from maasservicelayer.db.repositories.multiboot import (
@@ -17,48 +19,18 @@ from maasservicelayer.models.multiboot import (
     MultiBootPartition,
 )
 from maasservicelayer.builders.multiboot import (
-        MultiBootDeploymentBuilder,
-        MultiBootOSBuilder,
-        MultiBootPartitionBuilder,
+    MultiBootDeploymentBuilder,
+    MultiBootOSBuilder,
+    MultiBootPartitionBuilder,
 )
 from maasservicelayer.services.base import BaseService, ServiceCache
 
-class MultiBootOSService(
-    BaseService[
-        MultiBootOS,
-        MultiBootOSRepository,
-        MultiBootOSBuilder
-    ]
-):
-    def __init__(
-        self,
-        context: Context,
-        multiboot_os_repository: MultiBootOSRepository,
-        cache: ServiceCache | None = None,
-    ):
-        super().__init__(context, multiboot_os_repository, cache)
-
-
-class MultiBootPartitionService(
-    BaseService[
-        MultiBootPartition,
-        MultiBootPartitionRepository,
-        MultiBootPartitionBuilder,
-    ]
-):
-    def __init__(
-        self,
-        context: Context,
-        multiboot_partition_repository: MultiBootPartitionRepository,
-        cache: ServiceCache | None = None,
-    ):
-        super().__init__(context, multiboot_partition_repository, cache)
 
 class MultiBootDeploymentService(
     BaseService[
         MultiBootDeployment,
         MultiBootDeploymentRepository,
-        MultiBootDeploymentBuilder
+        MultiBootDeploymentBuilder,
     ]
 ):
     def __init__(
@@ -106,7 +78,7 @@ class MultiBootDeploymentService(
                 priority=os_data.get("priority", 0),
                 boot_disk_id=os_data.get("boot_disk_id"),
             )
-            os_model = await self.os_service.create(os_builder)
+            os_model = await self.os_repository.create(os_builder)
 
             for part_data in os_data.get("partitions", []):
                 part_builder = MultiBootPartitionBuilder(
@@ -115,7 +87,7 @@ class MultiBootDeploymentService(
                     size=part_data["size"],
                     fstype=part_data.get("fstype", "ext4"),
                 )
-                await self.partition_service.create(part_builder)
+                await self.partition_repository.create(part_builder)
 
         return deployment
 
@@ -160,4 +132,35 @@ class MultiBootDeploymentService(
             )
         )
 
+
+class MultiBootOSService(
+    BaseService[
+        MultiBootOS,
+        MultiBootOSRepository,
+        MultiBootOSBuilder,
+    ]
+):
+    def __init__(
+        self,
+        context: Context,
+        multiboot_os_repository: MultiBootOSRepository,
+        cache: ServiceCache | None = None,
+    ):
+        super().__init__(context, multiboot_os_repository, cache)
+
+
+class MultiBootPartitionService(
+    BaseService[
+        MultiBootPartition,
+        MultiBootPartitionRepository,
+        MultiBootPartitionBuilder,
+    ]
+):
+    def __init__(
+        self,
+        context: Context,
+        multiboot_partition_repository: MultiBootPartitionRepository,
+        cache: ServiceCache | None = None,
+    ):
+        super().__init__(context, multiboot_partition_repository, cache)
 

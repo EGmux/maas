@@ -1,4 +1,4 @@
-"maaservicelayer/models""
+"""maaservicelayer/models"
 Service layer models for multi-boot deployment.
 
 Maps to: src/maasservicelayer/models/multiboot.py (NEW)
