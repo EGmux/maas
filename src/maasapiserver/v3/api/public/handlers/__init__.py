@@ -90,7 +90,7 @@ APIv3 = API(
 )
 
 APIv3UI = API(
-    prefix=V2_API_UI_PREFIX,
+    prefix=V3_API_UI_PREFIX,
     handlers=[
         UISubnetsHandler(),
     ],
