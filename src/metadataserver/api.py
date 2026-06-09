@@ -1585,6 +1585,14 @@ class AnonMetaDataHandler(VersionIndexHandler):
         # non-binary content using DEFAULT_CHARSET (which is UTF-8 by default)
         # but only sets the charset parameter in the content-type header when
         # a content-type is NOT provided.
+        if node.status == NODE_STATUS.DEPLOYING:
+            multi_boot = NodeMetadata.objects.filter(
+                    node=node, key="multi_boot_preseed"
+                    ).first()
+            if multi_boot:
+                return HttpResponse(
+                        multi_boot.value.encode("utf-8"), content_type="text/plain"
+                )
         preseed = get_preseed(request, node)
         return HttpResponse(preseed, content_type="text/plain")
 
