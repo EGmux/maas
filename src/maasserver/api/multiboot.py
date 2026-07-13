@@ -19,7 +19,7 @@ import logging
 from django.core.exceptions import PermissionDenied
 
 from maasserver.api.support import operation
-from maasserver.enum import NODE_STATUS
+from maasserver.enum import NODE_STATUS, NODE_STATUS_CHOICES_DICT
 from maasserver.exceptions import (
     MAASAPIBadRequest,
     MAASAPIValidationError,
