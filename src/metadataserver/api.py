@@ -46,7 +46,14 @@ from maasserver.api.utils import (
     get_optional_param,
 )
 from maasserver.clusterrpc.driver_parameters import get_driver_types
-from maasserver.compose_preseed import get_apt_proxy
+from maasserver.compose_preseed import (
+        get_apt_proxy,
+        build_metadata_url,
+        get_base_preseed,
+        get_cloud_init_reporting,
+        get_rsyslog_host_port,
+
+)
 from maasserver.enum import NODE_STATUS, NODE_STATUS_CHOICES_DICT, NODE_TYPE
 from maasserver.exceptions import (
     ClusterUnavailable,
@@ -68,6 +75,7 @@ from maasserver.models import (
     SSHKey,
     SSLKey,
 )
+from django.urls import reverse
 from maasserver.models.event import Event
 from maasserver.models.tag import Tag
 from maasserver.models.timestampedmodel import now
@@ -1585,6 +1593,77 @@ class AnonMetaDataHandler(VersionIndexHandler):
         # non-binary content using DEFAULT_CHARSET (which is UTF-8 by default)
         # but only sets the charset parameter in the content-type header when
         # a content-type is NOT provided.
+        if node.status == NODE_STATUS.DEPLOYING:
+            multi_boot = NodeMetadata.objects.filter(
+                    node=node, key="multi_boot_preseed"
+                    ).first()
+            if multi_boot:
+                logger.info(
+                    "Multi-boot: building cloud-config for %s",
+                    node.system_id,
+                )
+                # Generate the full commissioning preseed (datasource,
+                # rsyslog, reporting) so cloud-init can talk back to MAAS,
+                # then inject the orchestrator as an additional task.
+                token = NodeKey.objects.get_token_for_node(node)
+                route = reverse("metadata")
+                metadata_url = build_metadata_url(
+                    request, route,
+                    node.get_boot_rack_controller(), node=node
+                )
+                cloud_config = get_base_preseed(node)
+                cloud_config.update({
+                    "datasource": {
+                        "MAAS": {
+                            "metadata_url": metadata_url,
+                            "consumer_key": token.consumer.key,
+                            "token_key": token.key,
+                            "token_secret": token.secret,
+                        }
+                    },
+                    "rsyslog": {
+                        "remotes": {
+                            "maas": get_rsyslog_host_port(request, node)
+                        }
+                    },
+                })
+                cloud_config.update(
+                    get_cloud_init_reporting(request, node, token)
+                )
+
+                # Inject orchestrator on top of the standard config
+                cloud_config["write_files"] = [
+                    {
+                        "path": "/tmp/multi-boot.sh",
+                        "content": multi_boot.value,
+                        "permissions": "0755",
+                    }
+                ]
+                cloud_config["runcmd"] = [
+                    ["/tmp/multi-boot.sh"],
+                ]
+
+                # Debug: log when cloud-init starts processing
+                cloud_config["bootcmd"] = [
+                    [
+                        "sh", "-c",
+                        "echo '[multiboot] cloud-init started at $(date)'"
+                        " > /dev/kmsg"
+                    ],
+                ]
+
+                response_body = ("#cloud-config\n" +
+                                 yaml.safe_dump(cloud_config)).encode("utf-8")
+                logger.info(
+                    "Multi-boot: serving %d bytes of cloud-config for %s",
+                    len(response_body),
+                    node.system_id,
+                )
+
+                return HttpResponse(
+                    response_body,
+                    content_type="text/plain",
+                )
         preseed = get_preseed(request, node)
         return HttpResponse(preseed, content_type="text/plain")
 
