@@ -1,0 +1,16 @@
+boot:
+  default: 0
+  timeout: 10
+oses:
+  - osystem: ubuntu
+    distro_series: noble
+    hwe_kernel: hwe-22.04
+    partitions:
+      /:        { size: "20G", fstype: ext4 }
+
+  - osystem: ubuntu
+    distro_series: noble
+    hwe_kernel: hwe-24.04
+    partitions:
+      /:        { size: "20G", fstype: ext4 }
+
